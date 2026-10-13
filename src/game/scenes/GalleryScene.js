@@ -6,6 +6,7 @@ import { generateTextures } from '../textures/TextureGenerator';
 import { Player } from '../objects/Player';
 import { EXHIBITS } from '../../data/exhibits';
 import { EventBus, EVENTS } from '../EventBus';
+import { GameState } from '../GameState';
 
 export class GalleryScene extends Phaser.Scene {
   constructor() {
@@ -77,13 +78,24 @@ export class GalleryScene extends Phaser.Scene {
     }
 
     // 4. Arch Doorway to Final Room (Center Top)
-    this.doorway = this.add.image(400, 32, 'doorway');
+    this.isDoorwayUnlocked = GameState.isArchwayUnlocked();
+    this.doorway = this.add.image(400, 32, this.isDoorwayUnlocked ? 'doorway' : 'doorway-locked');
     this.doorway.setDepth(20);
+
+    // Physical blocker wall preventing player from walking through when locked
+    this.doorBlocker = this.walls.create(400, 26, null);
+    this.doorBlocker.setVisible(false);
+    this.doorBlocker.body.setSize(48, 24);
+    this.doorBlocker.refreshBody();
+    if (this.isDoorwayUnlocked) {
+      this.doorBlocker.body.enable = false;
+    }
 
     // Doorway trigger sensor
     this.doorTrigger = this.physics.add.sprite(400, 38, null);
     this.doorTrigger.setVisible(false);
     this.doorTrigger.body.setSize(48, 20);
+    this.lastDoorNoticeTime = 0;
 
     // 5. Ornamental Marble Columns
     const columnPositions = [
@@ -131,7 +143,10 @@ export class GalleryScene extends Phaser.Scene {
     ];
 
     daisyPositions.forEach((pos, idx) => {
-      const vase = this.add.image(pos.x, pos.y, 'daisy-vase');
+      const daisyId = `daisy-g-${idx + 1}`;
+      const isAlreadyPicked = GameState.pickedDaisies.has(daisyId);
+
+      const vase = this.add.image(pos.x, pos.y, isAlreadyPicked ? 'daisy-vase-picked' : 'daisy-vase');
       vase.setDepth(pos.y + 12);
       const vaseBase = this.walls.create(pos.x, pos.y + 12, null);
       vaseBase.setVisible(false);
@@ -144,12 +159,12 @@ export class GalleryScene extends Phaser.Scene {
       bubble.setVisible(false);
 
       this.daisyItems.push({
-        id: `daisy-g-${idx + 1}`,
+        id: daisyId,
         x: pos.x,
         y: pos.y,
         vase,
         bubble,
-        picked: false
+        picked: isAlreadyPicked
       });
     });
 
@@ -225,22 +240,89 @@ export class GalleryScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, mapWidth, mapHeight);
     this.cameras.main.startFollow(this.player.sprite, true, 0.1, 0.1);
 
-    // 10. Doorway overlap transition
+    // 10. Doorway overlap transition (Gated: requires all exhibits viewed & gallery daisies picked)
     this.physics.add.overlap(this.player.sprite, this.doorTrigger, () => {
-      EventBus.emit(EVENTS.ENTER_FINAL_ROOM);
-      this.scene.start('FinalRoomScene');
+      if (GameState.isArchwayUnlocked()) {
+        EventBus.emit(EVENTS.ENTER_FINAL_ROOM);
+        this.scene.start('FinalRoomScene');
+      } else {
+        // Prevent player from entering locked archway
+        this.player.sprite.y = 56;
+        this.player.sprite.setVelocity(0, 40);
+
+        const now = this.time.now;
+        if (now - this.lastDoorNoticeTime > 2500) {
+          this.lastDoorNoticeTime = now;
+          const status = GameState.getStatus();
+          let msg = '';
+          if (status.exhibitsRemaining > 0 && status.daisiesRemaining > 0) {
+            msg = `Archway locked: View all exhibits (${status.viewedCount}/${status.totalExhibits}) & collect all daisies (${status.pickedCount}/${status.totalGalleryDaisies}) first 🔒`;
+          } else if (status.exhibitsRemaining > 0) {
+            msg = `Archway locked: View all exhibits first (${status.viewedCount}/${status.totalExhibits} viewed) 🔒`;
+          } else {
+            msg = `Archway locked: Collect all gallery daisies first (${status.pickedCount}/${status.totalGalleryDaisies} gathered) 🌼`;
+          }
+          EventBus.emit(EVENTS.SHOW_TOAST, { message: msg });
+        }
+      }
+    });
+
+    // Listen for doorway unlocking
+    this.unsubUnlock = EventBus.on(EVENTS.DOORWAY_UNLOCKED, () => {
+      this.unlockDoorway();
     });
 
     // Cleanup player listeners on scene shutdown
     this.events.once('shutdown', () => {
       this.player?.destroy();
+      this.unsubUnlock?.();
     });
 
     // Announce ready
     EventBus.emit(EVENTS.GAME_READY, { sceneKey: 'GalleryScene' });
   }
 
+  unlockDoorway() {
+    if (this.isDoorwayUnlocked) return;
+    this.isDoorwayUnlocked = true;
+
+    // Swap texture to glowing open portal
+    if (this.doorway) {
+      this.doorway.setTexture('doorway');
+    }
+
+    // Disable solid blocker wall
+    if (this.doorBlocker?.body) {
+      this.doorBlocker.body.enable = false;
+    }
+
+    // Golden sparkles burst around doorway
+    for (let i = 0; i < 14; i++) {
+      const sparkle = this.add.circle(
+        400 + (Math.random() - 0.5) * 40,
+        32 + (Math.random() - 0.5) * 24,
+        2.5,
+        i % 2 === 0 ? 0xffea75 : 0xffffff
+      );
+      sparkle.setDepth(100);
+      this.tweens.add({
+        targets: sparkle,
+        y: sparkle.y - 20 - Math.random() * 20,
+        alpha: 0,
+        scale: 0.2,
+        duration: 900 + Math.random() * 400,
+        ease: 'Cubic.easeOut',
+        onComplete: () => sparkle.destroy()
+      });
+    }
+
+    EventBus.emit(EVENTS.SHOW_TOAST, {
+      message: 'The archway has unlocked! The final chamber awaits ✨'
+    });
+  }
+
   onDaisyPicked(item) {
+    GameState.markDaisyPicked(item.id);
     if (item.bubble) {
       this.tweens.killTweensOf(item.bubble);
       item.bubble.setVisible(false);

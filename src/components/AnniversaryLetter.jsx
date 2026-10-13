@@ -1,12 +1,19 @@
 // src/components/AnniversaryLetter.jsx
 // Intimate anniversary letter presented on fine stationery paper
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X } from 'lucide-react';
 import { ANNIVERSARY_LETTER } from '../data/exhibits';
 import { EventBus, EVENTS } from '../game/EventBus';
 
 export function AnniversaryLetter({ daisyCount = 0, onClose }) {
+  const mountTimeRef = useRef(null);
+  const backdropDownRef = useRef(false);
+
+  useEffect(() => {
+    mountTimeRef.current = Date.now();
+  }, []);
+
   const fullText = useMemo(() => {
     return [
       ANNIVERSARY_LETTER.salutation,
@@ -40,15 +47,34 @@ export function AnniversaryLetter({ daisyCount = 0, onClose }) {
     onClose();
   };
 
+  const handleBackdropPointerDown = (e) => {
+    const elapsed = mountTimeRef.current ? Date.now() - mountTimeRef.current : 0;
+    if (e.target === e.currentTarget && elapsed >= 400) {
+      backdropDownRef.current = true;
+    } else {
+      backdropDownRef.current = false;
+    }
+  };
+
+  const handleBackdropClick = (e) => {
+    const elapsed = mountTimeRef.current ? Date.now() - mountTimeRef.current : 0;
+    if (e.target === e.currentTarget && backdropDownRef.current && elapsed >= 400) {
+      backdropDownRef.current = false;
+      handleClose();
+    }
+  };
+
   return (
     <div
       role="dialog"
       aria-modal="true"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/85 backdrop-blur-sm animate-fade-in"
-      onClick={handleClose}
+      onPointerDown={handleBackdropPointerDown}
+      onClick={handleBackdropClick}
     >
       <div
         className="relative w-full max-w-xl bg-[#faf6f0] text-[#2c2621] rounded-lg shadow-2xl border border-stone-300 overflow-hidden flex flex-col max-h-[92vh]"
+        onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Subtle Top Stationery Header */}

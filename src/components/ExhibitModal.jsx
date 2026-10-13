@@ -1,11 +1,18 @@
 // src/components/ExhibitModal.jsx
 // Gallery exhibit viewer designed like an authentic museum exhibition installation
 
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useRef } from 'react';
 import { X, MapPin, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { EventBus, EVENTS } from '../game/EventBus';
 
 export function ExhibitModal({ exhibit, onClose, onSelectExhibit, allExhibits = [] }) {
+  const mountTimeRef = useRef(null);
+  const backdropDownRef = useRef(false);
+
+  useEffect(() => {
+    mountTimeRef.current = Date.now();
+  }, []);
+
   const currentIndex = allExhibits.findIndex((e) => e.id === exhibit?.id);
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex >= 0 && currentIndex < allExhibits.length - 1;
@@ -26,6 +33,23 @@ export function ExhibitModal({ exhibit, onClose, onSelectExhibit, allExhibits = 
       onSelectExhibit(allExhibits[currentIndex + 1]);
     }
   }, [hasNext, onSelectExhibit, allExhibits, currentIndex]);
+
+  const handleBackdropPointerDown = (e) => {
+    const elapsed = mountTimeRef.current ? Date.now() - mountTimeRef.current : 0;
+    if (e.target === e.currentTarget && elapsed >= 400) {
+      backdropDownRef.current = true;
+    } else {
+      backdropDownRef.current = false;
+    }
+  };
+
+  const handleBackdropClick = (e) => {
+    const elapsed = mountTimeRef.current ? Date.now() - mountTimeRef.current : 0;
+    if (e.target === e.currentTarget && backdropDownRef.current && elapsed >= 400) {
+      backdropDownRef.current = false;
+      handleClose();
+    }
+  };
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -48,10 +72,12 @@ export function ExhibitModal({ exhibit, onClose, onSelectExhibit, allExhibits = 
       role="dialog"
       aria-modal="true"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-fade-in"
-      onClick={handleClose}
+      onPointerDown={handleBackdropPointerDown}
+      onClick={handleBackdropClick}
     >
       <div
         className="relative w-full max-w-2xl bg-[#141210] border border-stone-800 rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+        onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Subtle Top Metadata Bar */}

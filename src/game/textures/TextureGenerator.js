@@ -136,6 +136,61 @@ export function generateTextures(scene) {
     canvas.refresh();
   }
 
+  // 4b. Arch Doorway Locked (64x64)
+  if (!textures.exists('doorway-locked')) {
+    const canvas = textures.createCanvas('doorway-locked', 64, 64);
+    const ctx = canvas.getContext();
+
+    // Dark mahogany double doors behind arch
+    ctx.fillStyle = '#3a2012';
+    ctx.fillRect(10, 14, 44, 50);
+
+    // Door panel bevels
+    ctx.fillStyle = '#4a2a16';
+    ctx.fillRect(14, 22, 16, 17);
+    ctx.fillRect(34, 22, 16, 17);
+    ctx.fillRect(14, 43, 16, 17);
+    ctx.fillRect(34, 43, 16, 17);
+
+    // Center door seam
+    ctx.strokeStyle = '#1e1109';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(32, 16); ctx.lineTo(32, 64);
+    ctx.stroke();
+
+    // Arch frame (Dark mahogany and gold)
+    ctx.strokeStyle = '#61391f';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.arc(32, 28, 22, Math.PI, 0, false);
+    ctx.lineTo(54, 64);
+    ctx.lineTo(10, 64);
+    ctx.closePath();
+    ctx.stroke();
+
+    ctx.strokeStyle = '#d4af37';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(32, 28, 20, Math.PI, 0, false);
+    ctx.stroke();
+
+    // Antique Brass Padlock in center
+    ctx.fillStyle = '#d4af37';
+    ctx.fillRect(28, 36, 8, 8);
+    ctx.strokeStyle = '#8c6e1c';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(32, 36, 3, Math.PI, 0, false);
+    ctx.stroke();
+
+    // Keyhole
+    ctx.fillStyle = '#1e1109';
+    ctx.fillRect(31, 39, 2, 3);
+
+    canvas.refresh();
+  }
+
   // 5. Framed Exhibit Painting (32x40)
   if (!textures.exists('exhibit-frame')) {
     const canvas = textures.createCanvas('exhibit-frame', 32, 40);
